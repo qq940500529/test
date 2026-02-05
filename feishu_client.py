@@ -187,8 +187,8 @@ class FeishuClient:
         # 构建创建表的请求
         request = CreateAppTableRequest.builder() \
             .app_token(self.app_token) \
-            .request_body(ReqAppTable.builder()
-                .table(ReqAppTableTable.builder()
+            .request_body(CreateAppTableRequestBody.builder()
+                .table(ReqTable.builder()
                     .name(table_name)
                     .default_view_name("Default View")
                     .fields(sdk_fields)
