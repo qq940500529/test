@@ -1,5 +1,6 @@
 # Oracle Database
-cx_Oracle>=8.3.0
+# Using oracledb (new Oracle driver, no Instant Client required)
+oracledb>=1.4.0
 
 # Feishu SDK
 lark-oapi>=1.2.0

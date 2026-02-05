@@ -4,17 +4,12 @@
 
 ### 1. 环境准备 (Environment Setup)
 
-#### 安装Oracle Instant Client
-```bash
-# 下载并安装Oracle Instant Client
-# Download and install Oracle Instant Client
-# https://www.oracle.com/database/technologies/instant-client/downloads.html
-```
-
 #### 安装Python依赖
 ```bash
 pip install -r requirements.txt
 ```
+
+**注意**: 本项目使用 `oracledb` (Oracle官方新驱动)，采用Thin模式，无需安装Oracle Instant Client。
 
 ### 2. 配置 (Configuration)
 
@@ -191,14 +186,26 @@ CREATE INDEX idx_updated_at ON your_table(UPDATED_AT);
 
 ### 问题1: Oracle连接失败
 
-**错误**: `ORA-12154: TNS:could not resolve the connect identifier`
+**错误**: `ORA-12154: TNS:could not resolve the connect identifier` 或连接超时
 
 **解决方案**:
-1. 检查 `tnsnames.ora` 配置
-2. 确认 `ORACLE_HOME` 环境变量
-3. 测试连接：
-```bash
-sqlplus username/password@service_name
+1. 验证Oracle数据库地址、端口和服务名是否正确
+2. 检查网络连接和防火墙设置
+3. 如果使用Thin模式（默认），确保可以直接访问数据库
+4. 测试连接：
+```python
+import oracledb
+conn = oracledb.connect(user="username", password="password", 
+                        dsn="host:port/service_name")
+print("Connection successful!")
+conn.close()
+```
+
+**可选 - 使用Thick模式**:
+如果需要使用Oracle Instant Client的高级功能：
+```python
+import oracledb
+oracledb.init_oracle_client(lib_dir="/path/to/instantclient")
 ```
 
 ### 问题2: 飞书API认证失败
@@ -314,5 +321,6 @@ parallel python sync_oracle_to_feishu.py --config {} ::: config1.yaml config2.ya
 
 - [飞书开放平台](https://open.feishu.cn/)
 - [飞书多维表格API文档](https://open.feishu.cn/document/server-docs/docs/bitable-v1/bitable-overview)
-- [Oracle cx_Oracle文档](https://cx-oracle.readthedocs.io/)
+- [Oracle python-oracledb文档](https://python-oracledb.readthedocs.io/)
+- [Oracle cx_Oracle文档](https://cx-oracle.readthedocs.io/) (旧版本参考)
 - [Feishu Python SDK](https://github.com/larksuite/oapi-sdk-python)

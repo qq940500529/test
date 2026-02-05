@@ -16,21 +16,24 @@
 
 - Python 3.7+
 - Oracle Database (支持 Oracle 11g+)
-- Oracle Instant Client (cx_Oracle依赖)
 - 飞书开放平台应用凭证
+
+**注意**: 本项目使用 `oracledb` (Oracle的新官方驱动)，无需安装Oracle Instant Client。
 
 ## 安装 (Installation)
 
-### 1. 安装Oracle Instant Client
-
-根据你的操作系统下载并安装Oracle Instant Client:
-https://www.oracle.com/database/technologies/instant-client/downloads.html
-
-### 2. 安装Python依赖
+### 安装Python依赖
 
 ```bash
 pip install -r requirements.txt
 ```
+
+**注意**: 项目现在使用 `oracledb` 驱动，这是Oracle官方的新Python驱动程序。它支持两种模式：
+- **Thin模式** (默认): 纯Python实现，无需安装Oracle客户端库
+- **Thick模式** (可选): 需要Oracle Instant Client，提供更多高级功能
+
+对于大多数用户，Thin模式已经足够。如果需要Thick模式，请参考：
+https://python-oracledb.readthedocs.io/
 
 ## 配置 (Configuration)
 
@@ -246,4 +249,5 @@ MIT License
 - [飞书开放平台文档](https://open.feishu.cn/document/home/index)
 - [飞书多维表格API](https://open.feishu.cn/document/server-docs/docs/bitable-v1/bitable-overview)
 - [Oracle cx_Oracle文档](https://cx-oracle.readthedocs.io/)
+- [Oracle python-oracledb文档](https://python-oracledb.readthedocs.io/)
 - [Feishu SDK (lark-oapi)](https://github.com/larksuite/oapi-sdk-python)

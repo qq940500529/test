@@ -5,7 +5,7 @@ Oracle数据库模块
 Handles connection and data reading from Oracle database
 处理与Oracle数据库的连接和数据读取
 """
-import cx_Oracle
+import oracledb
 import logging
 import re
 from typing import List, Dict, Any, Optional
@@ -58,13 +58,13 @@ class OracleDataReader:
         """
         try:
             # 构建数据源名称(DSN)
-            dsn = cx_Oracle.makedsn(
+            dsn = oracledb.makedsn(
                 self.config['host'],  # 数据库主机地址
                 self.config['port'],  # 数据库端口
                 service_name=self.config['service_name']  # 服务名
             )
             # 创建数据库连接
-            self.connection = cx_Oracle.connect(
+            self.connection = oracledb.connect(
                 user=self.config['username'],  # 用户名
                 password=self.config['password'],  # 密码
                 dsn=dsn
@@ -218,7 +218,7 @@ class OracleDataReader:
             for i, col in enumerate(columns):
                 value = row[i]
                 # 转换Oracle特定类型为JSON可序列化类型
-                if isinstance(value, cx_Oracle.LOB):
+                if isinstance(value, oracledb.LOB):
                     value = value.read()  # LOB类型读取为文本
                 elif hasattr(value, 'isoformat'):  # 日期时间对象
                     value = value.isoformat()  # 转换为ISO格式字符串
