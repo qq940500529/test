@@ -1,0 +1,39 @@
+# Oracle to Feishu Data Sync Configuration
+
+# Oracle Database Configuration
+oracle:
+  host: "localhost"
+  port: 1521
+  service_name: "ORCL"
+  username: "your_username"
+  password: "your_password"
+  table_name: "YOUR_TABLE_NAME"
+  # Primary key column for tracking progress
+  primary_key: "ID"
+  # Column to track last sync (timestamp or incrementing ID)
+  sync_column: "UPDATED_AT"
+
+# Feishu (Lark) Configuration
+feishu:
+  # App credentials from Feishu Open Platform
+  app_id: "your_app_id"
+  app_secret: "your_app_secret"
+  # Multi-dimensional table (bitable) app token
+  app_token: "your_app_token"
+  # Base table ID (will create new tables when limit reached)
+  base_table_id: "your_table_id"
+  # Table name prefix for new tables
+  table_name_prefix: "DataSync"
+  # Max rows per table (Feishu limit is 20000)
+  max_rows_per_table: 20000
+
+# Sync Configuration
+sync:
+  # Batch size for reading from Oracle (recommend 1000-5000)
+  read_batch_size: 1000
+  # Batch size for writing to Feishu (max 500 per API limit)
+  write_batch_size: 500
+  # Checkpoint file to track sync progress
+  checkpoint_file: "sync_checkpoint.json"
+  # Rate limiting: max 50 requests per second
+  max_requests_per_second: 50
