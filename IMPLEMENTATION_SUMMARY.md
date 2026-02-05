@@ -108,7 +108,7 @@ feishu:
 
 sync:
   read_batch_size: 1000
-  write_batch_size: 500
+  write_batch_size: 1000
   checkpoint_file: "sync_checkpoint.json"
   max_requests_per_second: 50
 ```

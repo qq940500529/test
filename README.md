@@ -10,7 +10,7 @@
 - ✅ **自动表创建**: 可选提供初始表ID，如不提供程序将根据Oracle表结构自动创建表
 - ✅ **智能类型映射**: 程序自动将Oracle字段类型（VARCHAR2、NUMBER、DATE等）映射到飞书字段类型
 - ✅ **时区转换**: 程序自动将Oracle中的UTC时间转换为东八区时间（北京时间，UTC+8）
-- ✅ **速率限制**: 遵守飞书API限制（每秒50次请求，每批次500条记录）
+- ✅ **速率限制**: 遵守飞书API限制（每秒50次请求，每批次1000条记录）
 - ✅ **自动表管理**: 当数据超过2万行时自动创建新表，表名包含序号
 - ✅ **断点续传**: 支持中断后恢复，避免重复同步
 - ✅ **增量同步**: 只同步新增或更新的数据
@@ -105,7 +105,7 @@ feishu:
 # 同步配置
 sync:
   read_batch_size: 1000      # Oracle批量读取大小
-  write_batch_size: 500      # 飞书批量写入大小
+  write_batch_size: 1000      # 飞书批量写入大小
   checkpoint_file: "sync_checkpoint.json"
   max_requests_per_second: 50
 ```
@@ -190,7 +190,7 @@ Memory Buffer
 
 ```
 Memory Buffer
-    ↓ (程序分批500条)
+    ↓ (程序分批1000条)
 Feishu API (Rate Limited: 50 req/s)
     ↓
 Current Table (程序检查行数)
@@ -240,7 +240,7 @@ Current Table (程序检查行数)
 使用飞书官方SDK管理飞书多维表格。
 
 **主要方法:**
-- `batch_create_records()`: 批量创建记录（最多500条）
+- `batch_create_records()`: 批量创建记录（最多1000条）
 - `create_table()`: 创建新数据表
 - `get_table_row_count()`: 获取表行数
 - `write_records_with_table_management()`: 自动管理表切换

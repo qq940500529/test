@@ -474,18 +474,18 @@ class FeishuClient:
         records: List[Dict[str, Any]]
     ) -> List[str]:
         """
-        Batch create records in table using SDK (max 500 per batch)
-        使用SDK批量创建表记录（每批最多500条）
+        Batch create records in table using SDK (max 1000 per batch)
+        使用SDK批量创建表记录（每批最多1000条）
         
         Args:
             table_id: Table ID / 表ID
-            records: List of records to create (max 500) / 要创建的记录列表（最多500条）
+            records: List of records to create (max 1000) / 要创建的记录列表（最多1000条）
             
         Returns:
             List of created record IDs / 已创建记录的ID列表
         """
-        if len(records) > 500:
-            raise ValueError("批次大小不能超过500条记录 / Batch size cannot exceed 500 records")
+        if len(records) > 1000:
+            raise ValueError("批次大小不能超过1000条记录 / Batch size cannot exceed 1000 records")
         
         self._apply_rate_limit()  # 应用速率限制
         
@@ -599,8 +599,8 @@ class FeishuClient:
         # 更新当前表行数
         self.current_table_row_count = self.get_table_row_count(self.current_table_id)
         
-        # 分批处理记录（每批500条，飞书API限制）
-        batch_size = 500
+        # 分批处理记录（每批1000条，飞书API限制）
+        batch_size = 1000
         for i in range(0, len(records), batch_size):
             batch = records[i:i + batch_size]
             
