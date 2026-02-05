@@ -477,6 +477,11 @@ class FeishuClient:
         Batch create records in table using SDK (max 1000 per batch)
         使用SDK批量创建表记录（每批最多1000条）
         
+        Note: This uses the "batch_create" API endpoint which supports up to 1000 records.
+        The single "create" API endpoint only supports up to 500 records.
+        注意：此方法使用"新增多条记录"API端点，支持最多1000条记录。
+        "新增记录"API端点仅支持最多500条记录。
+        
         Args:
             table_id: Table ID / 表ID
             records: List of records to create (max 1000) / 要创建的记录列表（最多1000条）
@@ -599,7 +604,8 @@ class FeishuClient:
         # 更新当前表行数
         self.current_table_row_count = self.get_table_row_count(self.current_table_id)
         
-        # 分批处理记录（每批1000条，飞书API限制）
+        # 分批处理记录（每批1000条，使用batch_create API）
+        # Batch process records (1000 per batch, using batch_create API which supports up to 1000)
         batch_size = 1000
         for i in range(0, len(records), batch_size):
             batch = records[i:i + batch_size]
