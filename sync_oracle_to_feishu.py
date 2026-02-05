@@ -146,25 +146,8 @@ class OracleToFeishuSync:
             # 批量同步数据
             batch_size = self.config['sync']['read_batch_size']  # Oracle读取批次大小
             write_batch_size = self.config['sync']['write_batch_size']  # 飞书写入批次大小
-            
-            # Validate and log batch sizes
-            # 验证并记录批次大小
-            if write_batch_size > 1000:
-                logger.warning(f"write_batch_size配置为 {write_batch_size}，但飞书API限制为1000，将使用1000 / write_batch_size is configured as {write_batch_size}, but Feishu API limit is 1000, will use 1000")
-                write_batch_size = 1000
-            
-            # Calculate estimated number of database queries
-            # 计算预估的数据库查询次数
-            estimated_queries = (total_count + batch_size - 1) // batch_size  # Round up
-            estimated_api_calls = (total_count + write_batch_size - 1) // write_batch_size
-            
-            logger.info(f"批次大小配置 / Batch size configuration:")
-            logger.info(f"  - read_batch_size={batch_size} (预估数据库查询次数 / estimated DB queries: {estimated_queries})")
-            logger.info(f"  - write_batch_size={write_batch_size} (预估飞书API调用次数 / estimated Feishu API calls: {estimated_api_calls})")
-            
             offset = 0
             total_synced = 0
-            actual_db_queries = 0  # Track actual queries / 跟踪实际查询次数
             
             while offset < total_count:
                 logger.info(f"处理批次 / Processing batch: offset={offset}, total={total_count}")
@@ -179,8 +162,6 @@ class OracleToFeishuSync:
                     last_sync_value=last_sync_value if not full_sync else None,
                     order_by=sync_column  # 按同步列排序
                 )
-                
-                actual_db_queries += 1  # Increment query counter / 增加查询计数器
                 
                 if not records:
                     break
@@ -227,12 +208,9 @@ class OracleToFeishuSync:
             logger.info("=" * 60)
             logger.info("同步成功完成 / Synchronization completed successfully")
             logger.info(f"总同步记录数 / Total records synced: {total_synced}")
-            logger.info(f"实际数据库查询次数 / Actual DB queries: {actual_db_queries}")
             logger.info(f"耗时 / Duration: {duration:.2f} seconds")
             if total_synced > 0:
                 logger.info(f"平均速度 / Average speed: {total_synced/duration:.2f} records/second")
-            if actual_db_queries > 0:
-                logger.info(f"每次查询平均记录数 / Average records per query: {total_synced/actual_db_queries:.2f}")
             logger.info("=" * 60)
             
         except Exception as e:

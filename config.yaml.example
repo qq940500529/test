@@ -32,19 +32,10 @@ feishu:
 
 # Sync Configuration / 同步配置
 sync:
-  # Batch size for reading from Oracle / 从Oracle读取的批次大小
-  # Larger values reduce database queries but use more memory
-  # 更大的值减少数据库查询但使用更多内存
-  # Recommended range: 1000-10000 / 建议范围：1000-10000
-  # For large tables with simple data types, you can use up to 50000
-  # 对于数据类型简单的大表，可以使用最多50000
-  read_batch_size: 5000
-  
-  # Batch size for writing to Feishu (max 1000 per API limit, recommended: 1000) / 写入飞书的批次大小（API限制最多1000，建议：1000）
-  # Note: Using less than 1000 (e.g., 500) will result in more API calls and slower sync
-  # 注意：使用小于1000的值（如500）会导致更多API调用和更慢的同步速度
+  # Batch size for reading from Oracle (recommend 1000-5000) / 从Oracle读取的批次大小（建议1000-5000）
+  read_batch_size: 1000
+  # Batch size for writing to Feishu (max 1000 per API limit) / 写入飞书的批次大小（API限制最多1000）
   write_batch_size: 1000
-  
   # Checkpoint file to track sync progress / 用于跟踪同步进度的检查点文件
   checkpoint_file: "sync_checkpoint.json"
   # Rate limiting: max 50 requests per second / 速率限制：每秒最多50次请求
