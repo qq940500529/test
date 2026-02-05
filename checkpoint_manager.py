@@ -151,6 +151,16 @@ class CheckpointManager:
         """
         return self.checkpoint_data.copy()
     
+    def get_fresh_checkpoint(self) -> Dict[str, Any]:
+        """
+        Get a fresh checkpoint (for full sync)
+        获取一个新的检查点（用于完整同步）
+        
+        Returns:
+            Fresh checkpoint data / 新的检查点数据
+        """
+        return self._get_default_checkpoint()
+    
     def reset(self):
         """
         Reset checkpoint to start fresh

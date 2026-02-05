@@ -99,7 +99,7 @@ class OracleToFeishuSync:
             
             if full_sync:
                 logger.info("完整同步模式：忽略检查点 / Full sync mode: ignoring checkpoint")
-                checkpoint = self.checkpoint_manager._get_default_checkpoint()
+                checkpoint = self.checkpoint_manager.get_fresh_checkpoint()
                 self.checkpoint_manager.reset()
             
             # 获取表信息
@@ -111,19 +111,18 @@ class OracleToFeishuSync:
             columns = self.oracle_reader.get_table_columns(table_name)
             logger.info(f"表列 / Table columns: {', '.join(columns)}")
             
-            # 构建WHERE子句用于增量同步
-            where_clause = ""
+            # 构建增量同步参数
             last_sync_value = checkpoint.get('last_sync_value')
             
             if last_sync_value and not full_sync:
                 logger.info(f"从上次同步值恢复 / Resuming from last sync value: {last_sync_value}")
-                if isinstance(last_sync_value, str):
-                    where_clause = f"{sync_column} > '{last_sync_value}'"
-                else:
-                    where_clause = f"{sync_column} > {last_sync_value}"
             
             # 获取总记录数
-            total_count = self.oracle_reader.get_total_count(table_name, where_clause)
+            total_count = self.oracle_reader.get_total_count(
+                table_name, 
+                sync_column if (last_sync_value and not full_sync) else None,
+                last_sync_value if not full_sync else None
+            )
             logger.info(f"要同步的总记录数 / Total records to sync: {total_count}")
             
             if total_count == 0:
@@ -144,13 +143,14 @@ class OracleToFeishuSync:
             while offset < total_count:
                 logger.info(f"处理批次 / Processing batch: offset={offset}, total={total_count}")
                 
-                # 从Oracle读取批次
+                # 从Oracle读取批次（使用参数化查询）
                 records = self.oracle_reader.read_batch(
                     table_name=table_name,
                     columns=columns,
                     batch_size=batch_size,
                     offset=offset,
-                    where_clause=where_clause,
+                    sync_column=sync_column if (last_sync_value and not full_sync) else None,
+                    last_sync_value=last_sync_value if not full_sync else None,
                     order_by=sync_column  # 按同步列排序
                 )
                 
@@ -187,7 +187,9 @@ class OracleToFeishuSync:
                 
                 offset += len(records)
                 
-                logger.info(f"进度 / Progress: {offset}/{total_count} ({offset*100//total_count}%)")
+                # 防止除零错误
+                if total_count > 0:
+                    logger.info(f"进度 / Progress: {offset}/{total_count} ({offset*100//total_count}%)")
             
             # 汇总信息
             end_time = datetime.now()
@@ -197,7 +199,8 @@ class OracleToFeishuSync:
             logger.info("同步成功完成 / Synchronization completed successfully")
             logger.info(f"总同步记录数 / Total records synced: {total_synced}")
             logger.info(f"耗时 / Duration: {duration:.2f} seconds")
-            logger.info(f"平均速度 / Average speed: {total_synced/duration:.2f} records/second")
+            if total_synced > 0:
+                logger.info(f"平均速度 / Average speed: {total_synced/duration:.2f} records/second")
             logger.info("=" * 60)
             
         except Exception as e:

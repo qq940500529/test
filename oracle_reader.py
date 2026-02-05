@@ -77,36 +77,42 @@ class OracleDataReader:
         Returns:
             List of column names / 列名列表
         """
-        # 查询表的列信息，按列顺序排序
-        query = f"""
+        # 使用参数化查询防止SQL注入
+        # Use parameterized query to prevent SQL injection
+        query = """
             SELECT column_name 
             FROM user_tab_columns 
-            WHERE table_name = UPPER('{table_name}')
+            WHERE table_name = UPPER(:table_name)
             ORDER BY column_id
         """
-        self.cursor.execute(query)
+        self.cursor.execute(query, table_name=table_name)
         columns = [row[0] for row in self.cursor.fetchall()]
         logger.info(f"在表 {table_name} 中找到 {len(columns)} 列 / Found {len(columns)} columns in table {table_name}")
         return columns
     
-    def get_total_count(self, table_name: str, where_clause: str = "") -> int:
+    def get_total_count(self, table_name: str, sync_column: str = None, last_sync_value: Any = None) -> int:
         """
         Get total record count
         获取记录总数
         
         Args:
             table_name: Name of the table / 表名
-            where_clause: Optional WHERE clause for filtering / 可选的WHERE条件子句
+            sync_column: Column for incremental sync / 增量同步列
+            last_sync_value: Last sync value for filtering / 用于过滤的最后同步值
             
         Returns:
             Total count of records / 记录总数
         """
-        # 构建COUNT查询语句
-        query = f"SELECT COUNT(*) FROM {table_name}"
-        if where_clause:
-            query += f" WHERE {where_clause}"  # 添加过滤条件
+        # 使用参数化查询防止SQL注入
+        # Use parameterized query to prevent SQL injection
+        if sync_column and last_sync_value is not None:
+            # 对于增量同步，使用参数化查询
+            query = f"SELECT COUNT(*) FROM {table_name} WHERE {sync_column} > :last_value"
+            self.cursor.execute(query, last_value=last_sync_value)
+        else:
+            query = f"SELECT COUNT(*) FROM {table_name}"
+            self.cursor.execute(query)
         
-        self.cursor.execute(query)
         count = self.cursor.fetchone()[0]
         logger.info(f"记录总数 / Total records: {count}")
         return count
@@ -117,7 +123,8 @@ class OracleDataReader:
         columns: List[str],
         batch_size: int = 1000,
         offset: int = 0,
-        where_clause: str = "",
+        sync_column: str = None,
+        last_sync_value: Any = None,
         order_by: str = ""
     ) -> List[Dict[str, Any]]:
         """
@@ -129,7 +136,8 @@ class OracleDataReader:
             columns: List of column names to read / 要读取的列名列表
             batch_size: Number of records per batch / 每批记录数
             offset: Starting offset for pagination / 分页起始偏移量
-            where_clause: Optional WHERE clause / 可选WHERE条件
+            sync_column: Column for incremental sync / 增量同步列
+            last_sync_value: Last sync value for filtering / 用于过滤的最后同步值
             order_by: Optional ORDER BY clause / 可选ORDER BY子句
             
         Returns:
@@ -137,27 +145,32 @@ class OracleDataReader:
         """
         # 构建SELECT语句的列部分
         columns_str = ", ".join(columns)
-        query = f"SELECT {columns_str} FROM {table_name}"
+        base_query = f"SELECT {columns_str} FROM {table_name}"
         
-        # 添加WHERE条件（如果有）
-        if where_clause:
-            query += f" WHERE {where_clause}"
+        # 构建WHERE条件（使用参数化查询）
+        params = {}
+        if sync_column and last_sync_value is not None:
+            base_query += f" WHERE {sync_column} > :last_value"
+            params['last_value'] = last_sync_value
         
         # 添加排序（如果有）
         if order_by:
-            query += f" ORDER BY {order_by}"
+            base_query += f" ORDER BY {order_by}"
         
         # Oracle分页查询：使用ROWNUM实现分页
         # 内层查询限制最大行数，外层查询过滤掉之前的行
         query = f"""
             SELECT * FROM (
                 SELECT a.*, ROWNUM rnum FROM (
-                    {query}
-                ) a WHERE ROWNUM <= {offset + batch_size}
-            ) WHERE rnum > {offset}
+                    {base_query}
+                ) a WHERE ROWNUM <= :max_row
+            ) WHERE rnum > :min_row
         """
         
-        self.cursor.execute(query)
+        params['max_row'] = offset + batch_size
+        params['min_row'] = offset
+        
+        self.cursor.execute(query, **params)
         rows = self.cursor.fetchall()
         
         # 将查询结果转换为字典列表

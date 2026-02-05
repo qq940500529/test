@@ -16,6 +16,28 @@ from lark_oapi.api.bitable.v1 import *
 
 logger = logging.getLogger(__name__)
 
+# 飞书字段类型常量 / Feishu field type constants
+FIELD_TYPE_TEXT = 1  # 文本
+FIELD_TYPE_NUMBER = 2  # 数字
+FIELD_TYPE_SINGLE_SELECT = 3  # 单选
+FIELD_TYPE_MULTI_SELECT = 4  # 多选
+FIELD_TYPE_DATE = 5  # 日期
+FIELD_TYPE_CHECKBOX = 7  # 复选框
+FIELD_TYPE_PERSON = 11  # 人员
+FIELD_TYPE_PHONE = 13  # 电话
+FIELD_TYPE_URL = 15  # URL
+FIELD_TYPE_ATTACHMENT = 17  # 附件
+FIELD_TYPE_SINGLE_LINK = 18  # 单向关联
+FIELD_TYPE_FORMULA = 20  # 公式
+FIELD_TYPE_TWO_WAY_LINK = 21  # 双向关联
+FIELD_TYPE_LOCATION = 22  # 地理位置
+FIELD_TYPE_GROUP_CHAT = 23  # 群组
+FIELD_TYPE_CREATED_TIME = 1001  # 创建时间
+FIELD_TYPE_MODIFIED_TIME = 1002  # 修改时间
+FIELD_TYPE_CREATED_BY = 1003  # 创建人
+FIELD_TYPE_MODIFIED_BY = 1004  # 修改人
+FIELD_TYPE_AUTO_NUMBER = 1005  # 自动编号
+
 
 class FeishuClient:
     """
@@ -70,7 +92,7 @@ class FeishuClient:
         Returns:
             Table information / 表信息
         """
-        self._rate_limited_call()  # 应用速率限制
+        self._apply_rate_limit()  # 应用速率限制
         
         # 构建获取表信息的请求
         request = GetAppTableRequest.builder() \
@@ -103,7 +125,7 @@ class FeishuClient:
         Returns:
             Number of rows / 行数
         """
-        self._rate_limited_call()  # 应用速率限制
+        self._apply_rate_limit()  # 应用速率限制
         
         # 构建列表记录请求，只获取1条用于获取总数
         request = ListAppTableRecordRequest.builder() \
@@ -132,7 +154,7 @@ class FeishuClient:
         Returns:
             New table ID / 新表ID
         """
-        self._rate_limited_call()  # 应用速率限制
+        self._apply_rate_limit()  # 应用速率限制
         
         # 将字段转换为SDK格式
         sdk_fields = []
@@ -173,7 +195,7 @@ class FeishuClient:
         Returns:
             List of tables / 表列表
         """
-        self._rate_limited_call()  # 应用速率限制
+        self._apply_rate_limit()  # 应用速率限制
         
         tables = []
         page_token = None
@@ -221,7 +243,7 @@ class FeishuClient:
         Returns:
             List of field definitions / 字段定义列表
         """
-        self._rate_limited_call()  # 应用速率限制
+        self._apply_rate_limit()  # 应用速率限制
         
         # 构建获取字段列表的请求
         request = ListAppTableFieldRequest.builder() \
@@ -264,7 +286,7 @@ class FeishuClient:
         # 创建缺失的字段
         for field_name, value in sample_record.items():
             if field_name not in existing_field_names:
-                self._rate_limited_call()  # 应用速率限制
+                self._apply_rate_limit()  # 应用速率限制
                 
                 # 从值推断字段类型
                 field_type = self._infer_field_type(value)
@@ -297,26 +319,26 @@ class FeishuClient:
         Returns:
             Field type code / 字段类型代码
         """
-        # 飞书字段类型映射：
-        # 1: 文本 (Text), 2: 数字 (Number), 3: 单选 (Single Select), 4: 多选 (Multi Select)
-        # 5: 日期 (Date), 7: 复选框 (Checkbox), 11: 人员 (Person), 13: 电话 (Phone), 15: URL
-        # 17: 附件 (Attachment), 18: 单向关联 (Single Link), 20: 公式 (Formula), 21: 双向关联 (Two-way Link)
-        # 22: 地理位置 (Location), 23: 群组 (GroupChat), 1001: 创建时间 (Created time), 1002: 修改时间 (Modified time)
-        # 1003: 创建人 (Created by), 1004: 修改人 (Modified by), 1005: 自动编号 (Auto number)
-        
         if value is None:
-            return 1  # 文本
+            return FIELD_TYPE_TEXT
         elif isinstance(value, bool):
-            return 7  # 复选框
+            return FIELD_TYPE_CHECKBOX
         elif isinstance(value, (int, float)):
-            return 2  # 数字
+            return FIELD_TYPE_NUMBER
         elif isinstance(value, str):
-            # 尝试检测日期格式
-            if len(value) >= 10 and value[4] == '-' and value[7] == '-':
-                return 5  # 日期
-            return 1  # 文本
+            # Try to detect date format using proper parsing
+            # 尝试使用正确的解析来检测日期格式
+            if len(value) >= 10:
+                try:
+                    from datetime import datetime
+                    # Try ISO format parsing
+                    datetime.fromisoformat(value.split('T')[0])
+                    return FIELD_TYPE_DATE
+                except (ValueError, AttributeError):
+                    pass
+            return FIELD_TYPE_TEXT
         else:
-            return 1  # 默认为文本
+            return FIELD_TYPE_TEXT
     
     def batch_create_records(
         self, 
@@ -337,7 +359,7 @@ class FeishuClient:
         if len(records) > 500:
             raise ValueError("批次大小不能超过500条记录 / Batch size cannot exceed 500 records")
         
-        self._rate_limited_call()  # 应用速率限制
+        self._apply_rate_limit()  # 应用速率限制
         
         # 将记录格式化为SDK格式
         sdk_records = []
