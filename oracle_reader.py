@@ -9,8 +9,12 @@ import oracledb
 import logging
 import re
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
+
+# 东八区时区 (+8小时)
+TIMEZONE_UTC8 = timezone(timedelta(hours=8))
 
 
 def _validate_sql_identifier(identifier: str) -> bool:
@@ -50,6 +54,8 @@ class OracleDataReader:
         self.config = config
         self.connection = None  # 数据库连接对象
         self.cursor = None  # 游标对象
+        # 是否启用UTC到+8时区转换（默认启用）
+        self.convert_utc_to_utc8 = config.get('convert_utc_to_utc8', True)
         
     def connect(self):
         """
@@ -86,6 +92,29 @@ class OracleDataReader:
         if self.connection:
             self.connection.close()  # 关闭连接
         logger.info("已断开Oracle数据库连接 / Disconnected from Oracle database")
+    
+    def convert_utc_datetime_to_utc8(self, dt: datetime) -> datetime:
+        """
+        Convert UTC datetime to UTC+8 timezone
+        将UTC时间转换为东八区时间（+8小时）
+        
+        Args:
+            dt: UTC datetime object / UTC时间对象
+            
+        Returns:
+            Datetime in UTC+8 timezone / 东八区时间对象
+        """
+        if dt is None:
+            return None
+        
+        # 如果时间对象没有时区信息，假定为UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        # 转换到东八区
+        dt_utc8 = dt.astimezone(TIMEZONE_UTC8)
+        
+        return dt_utc8
     
     def get_table_columns(self, table_name: str) -> List[str]:
         """
@@ -258,6 +287,9 @@ class OracleDataReader:
                 if isinstance(value, oracledb.LOB):
                     value = value.read()  # LOB类型读取为文本
                 elif hasattr(value, 'isoformat'):  # 日期时间对象
+                    # 如果启用UTC到+8时区转换
+                    if self.convert_utc_to_utc8:
+                        value = self.convert_utc_datetime_to_utc8(value)
                     value = value.isoformat()  # 转换为ISO格式字符串
                 record[col] = value
             records.append(record)

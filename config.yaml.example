@@ -13,6 +13,8 @@ oracle:
   primary_key: "ID"
   # Column to track last sync (timestamp or incrementing ID) / 用于跟踪最后同步的列（时间戳或递增ID）
   sync_column: "UPDATED_AT"
+  # Convert UTC time to UTC+8 (Beijing time) / 将UTC时间转换为东八区时间（北京时间）
+  convert_utc_to_utc8: true  # 默认为true，设置为false可禁用时区转换
 
 # Feishu (Lark) Configuration / 飞书配置
 feishu:

@@ -30,6 +30,7 @@ oracle:
   table_name: "YOUR_TABLE"       # 表名
   primary_key: "ID"              # 主键列
   sync_column: "UPDATED_AT"      # 增量同步列
+  convert_utc_to_utc8: true      # UTC到+8时区转换（默认启用）
 
 feishu:
   app_id: "cli_xxxxx"            # 飞书应用ID
@@ -108,7 +109,32 @@ feishu:
 
 飞书表将自动创建完全对应的字段。
 
-### 1. 断点续传 (Resumable Transfer)
+### 1. 时区转换 (Timezone Conversion)
+
+**重要特性**: Oracle中存储的UTC时间会自动转换为东八区时间（北京时间，UTC+8）。
+
+- **自动转换**: 所有日期/时间字段会自动进行时区转换
+- **配置选项**: 可通过配置文件控制是否启用时区转换
+- **时间格式**: 转换后的时间采用ISO 8601格式，包含时区信息
+
+**配置方式**:
+```yaml
+oracle:
+  # ... 其他配置 ...
+  convert_utc_to_utc8: true  # 启用UTC到+8时区转换（默认）
+  # convert_utc_to_utc8: false  # 禁用时区转换，保持原始UTC时间
+```
+
+**转换示例**:
+- Oracle UTC时间: `2024-01-01 00:00:00` (UTC)
+- 转换后时间: `2024-01-01T08:00:00+08:00` (北京时间)
+
+**注意事项**:
+1. 只有日期/时间类型字段会被转换（DATE, TIMESTAMP等）
+2. 文本、数字等其他类型字段不受影响
+3. 如果Oracle中的时间已经是本地时间，请设置 `convert_utc_to_utc8: false`
+
+### 2. 断点续传 (Resumable Transfer)
 
 程序使用检查点文件 `sync_checkpoint.json` 记录同步进度：
 - 最后同步的数据值
@@ -118,7 +144,7 @@ feishu:
 
 如果同步中断，下次运行时会自动从上次中断的位置继续。
 
-### 2. 增量同步 (Incremental Sync)
+### 3. 增量同步 (Incremental Sync)
 
 通过配置 `sync_column`（如时间戳或递增ID），程序只同步新增或更新的数据：
 
@@ -127,7 +153,7 @@ feishu:
 SELECT * FROM table WHERE UPDATED_AT > '上次同步值'
 ```
 
-### 3. 自动表管理 (Automatic Table Management)
+### 4. 自动表管理 (Automatic Table Management)
 
 当数据超过2万行（飞书限制）时，自动创建新表：
 - DataSync_001 (前2万行)
@@ -135,13 +161,13 @@ SELECT * FROM table WHERE UPDATED_AT > '上次同步值'
 - DataSync_003 (4万-6万行)
 - ...
 
-### 4. 速率限制 (Rate Limiting)
+### 5. 速率限制 (Rate Limiting)
 
 遵守飞书API限制：
 - 每秒最多50次请求
 - 每批次最多500条记录
 
-### 5. 数据类型映射 (Data Type Mapping)
+### 6. 数据类型映射 (Data Type Mapping)
 
 | Oracle类型 | 飞书类型 |
 |-----------|---------|
