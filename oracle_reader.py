@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 # 东八区时区 (+8小时)
 TIMEZONE_UTC8 = timezone(timedelta(hours=8))
 
+# Oracle日期/时间戳类型常量
+# Oracle DATE/TIMESTAMP types constants
+_DATE_TYPES = ('DATE', 'TIMESTAMP')
+
 
 def _validate_sql_identifier(identifier: str) -> bool:
     """
@@ -184,7 +188,11 @@ class OracleDataReader:
         
         # If it's a DATE or TIMESTAMP type and the value is numeric (millisecond timestamp)
         # 如果是DATE或TIMESTAMP类型且值是数字（毫秒时间戳）
-        if column_type in ('DATE', 'TIMESTAMP', 'TIMESTAMP(6)') and isinstance(last_sync_value, (int, float)):
+        # Check if column_type is DATE or starts with TIMESTAMP to handle all precision variants
+        # 检查是否为DATE或以TIMESTAMP开头，以处理所有精度变体
+        is_date_type = column_type in _DATE_TYPES or (column_type and column_type.startswith('TIMESTAMP'))
+        
+        if is_date_type and isinstance(last_sync_value, (int, float)):
             # Convert millisecond timestamp to datetime
             # 将毫秒时间戳转换为datetime
             return self._convert_timestamp_to_date(last_sync_value)
