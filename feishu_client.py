@@ -72,14 +72,33 @@ class FeishuClient:
         self.current_table_id = self.base_table_id  # 当前使用的表ID
         self.current_table_row_count = 0  # 当前表的行数
         
-    @sleep_and_retry
-    @limits(calls=50, period=1)  # 50 requests per second / 每秒50次请求
-    def _rate_limited_call(self):
+        # Rate limiting tracking / 速率限制追踪
+        self._last_request_time = 0
+        self._request_count = 0
+    
+    def _apply_rate_limit(self):
         """
-        Rate limiting decorator for API calls
-        API调用的速率限制装饰器
+        Apply rate limiting before API calls
+        在API调用前应用速率限制
         """
-        pass
+        current_time = time.time()
+        
+        # Reset counter if more than 1 second has passed
+        # 如果超过1秒，重置计数器
+        if current_time - self._last_request_time >= 1.0:
+            self._request_count = 0
+            self._last_request_time = current_time
+        
+        # If reached limit, wait until next second
+        # 如果达到限制，等待到下一秒
+        if self._request_count >= self.max_requests_per_second:
+            sleep_time = 1.0 - (current_time - self._last_request_time)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            self._request_count = 0
+            self._last_request_time = time.time()
+        
+        self._request_count += 1
     
     def get_table_info(self, table_id: str) -> Dict[str, Any]:
         """

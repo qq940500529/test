@@ -7,9 +7,30 @@ Handles connection and data reading from Oracle database
 """
 import cx_Oracle
 import logging
+import re
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_sql_identifier(identifier: str) -> bool:
+    """
+    Validate SQL identifier to prevent SQL injection
+    验证SQL标识符以防止SQL注入
+    
+    Args:
+        identifier: SQL identifier (table name, column name, etc.) / SQL标识符
+        
+    Returns:
+        True if valid, raises ValueError if invalid
+    """
+    # Allow alphanumeric characters, underscores, and dollar signs
+    # 允许字母数字字符、下划线和美元符号
+    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_$]*$', identifier):
+        raise ValueError(f"Invalid SQL identifier: {identifier}. Only alphanumeric characters, underscores, and dollar signs are allowed.")
+    if len(identifier) > 30:  # Oracle limit
+        raise ValueError(f"SQL identifier too long: {identifier}. Maximum length is 30 characters.")
+    return True
 
 
 class OracleDataReader:
@@ -77,6 +98,9 @@ class OracleDataReader:
         Returns:
             List of column names / 列名列表
         """
+        # 验证表名以防止SQL注入
+        _validate_sql_identifier(table_name)
+        
         # 使用参数化查询防止SQL注入
         # Use parameterized query to prevent SQL injection
         query = """
@@ -103,6 +127,11 @@ class OracleDataReader:
         Returns:
             Total count of records / 记录总数
         """
+        # 验证SQL标识符以防止SQL注入
+        _validate_sql_identifier(table_name)
+        if sync_column:
+            _validate_sql_identifier(sync_column)
+        
         # 使用参数化查询防止SQL注入
         # Use parameterized query to prevent SQL injection
         if sync_column and last_sync_value is not None:
@@ -143,6 +172,15 @@ class OracleDataReader:
         Returns:
             List of records as dictionaries / 记录列表（字典格式）
         """
+        # 验证SQL标识符以防止SQL注入
+        _validate_sql_identifier(table_name)
+        for col in columns:
+            _validate_sql_identifier(col)
+        if sync_column:
+            _validate_sql_identifier(sync_column)
+        if order_by:
+            _validate_sql_identifier(order_by)
+        
         # 构建SELECT语句的列部分
         columns_str = ", ".join(columns)
         base_query = f"SELECT {columns_str} FROM {table_name}"
@@ -202,6 +240,10 @@ class OracleDataReader:
         Returns:
             Maximum value / 最大值
         """
+        # 验证SQL标识符以防止SQL注入
+        _validate_sql_identifier(table_name)
+        _validate_sql_identifier(column_name)
+        
         query = f"SELECT MAX({column_name}) FROM {table_name}"
         self.cursor.execute(query)
         result = self.cursor.fetchone()[0]
