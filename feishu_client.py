@@ -604,34 +604,29 @@ class FeishuClient:
         # 更新当前表行数
         self.current_table_row_count = self.get_table_row_count(self.current_table_id)
         
-        # 分批处理记录（每批1000条，使用batch_create API）
-        # Batch process records (1000 per batch, using batch_create API which supports up to 1000)
-        batch_size = 1000
-        for i in range(0, len(records), batch_size):
-            batch = records[i:i + batch_size]
-            
-            # 检查是否需要创建新表
-            if self.current_table_row_count + len(batch) > self.max_rows_per_table:
-                # 创建新表
-                current_sequence += 1
-                if oracle_schema:
-                    # Use Oracle schema for new table
-                    # 使用Oracle架构创建新表
-                    self.current_table_id = self.create_table_from_oracle_schema(oracle_schema, current_sequence)
-                    self.current_table_row_count = 0
-                else:
-                    # Fallback to existing method
-                    # 回退到现有方法
-                    self.get_or_create_next_table(records[0], current_sequence)
-            
-            # 确保当前表中存在所需字段（首批或新表）
-            if i == 0 or self.current_table_row_count == 0:
-                self.create_fields_if_needed(self.current_table_id, records[0])
-            
-            # 写入批次数据
-            self.batch_create_records(self.current_table_id, batch)
-            self.current_table_row_count += len(batch)
-            total_written += len(batch)
+        # 检查是否需要创建新表
+        if self.current_table_row_count + len(records) > self.max_rows_per_table:
+            # 创建新表
+            current_sequence += 1
+            if oracle_schema:
+                # Use Oracle schema for new table
+                # 使用Oracle架构创建新表
+                self.current_table_id = self.create_table_from_oracle_schema(oracle_schema, current_sequence)
+                self.current_table_row_count = 0
+            else:
+                # Fallback to existing method
+                # 回退到现有方法
+                self.get_or_create_next_table(records[0], current_sequence)
+        
+        # 确保当前表中存在所需字段
+        # Ensure required fields exist in current table
+        self.create_fields_if_needed(self.current_table_id, records[0])
+        
+        # 写入批次数据（调用代码已经按配置的write_batch_size分批）
+        # Write batch data (calling code already batched by configured write_batch_size)
+        self.batch_create_records(self.current_table_id, records)
+        self.current_table_row_count += len(records)
+        total_written += len(records)
         
         return {
             "table_id": self.current_table_id,
