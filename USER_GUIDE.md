@@ -169,7 +169,7 @@ SELECT * FROM table WHERE UPDATED_AT > '上次同步值'
 
 遵守飞书API限制：
 - 每秒最多50次请求
-- 每批次最多500条记录
+- 每批次最多1000条记录
 
 ### 6. 数据类型映射 (Data Type Mapping)
 
@@ -239,7 +239,7 @@ tail -n 100 sync.log
 ```yaml
 sync:
   read_batch_size: 2000  # 增大读取批次
-  write_batch_size: 500  # 保持写入批次为500（API限制）
+  write_batch_size: 1000  # 保持写入批次为1000（API限制）
 ```
 
 2. **优化数据库查询**

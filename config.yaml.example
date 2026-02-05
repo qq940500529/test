@@ -34,8 +34,8 @@ feishu:
 sync:
   # Batch size for reading from Oracle (recommend 1000-5000) / 从Oracle读取的批次大小（建议1000-5000）
   read_batch_size: 1000
-  # Batch size for writing to Feishu (max 500 per API limit) / 写入飞书的批次大小（API限制最多500）
-  write_batch_size: 500
+  # Batch size for writing to Feishu (max 1000 per API limit) / 写入飞书的批次大小（API限制最多1000）
+  write_batch_size: 1000
   # Checkpoint file to track sync progress / 用于跟踪同步进度的检查点文件
   checkpoint_file: "sync_checkpoint.json"
   # Rate limiting: max 50 requests per second / 速率限制：每秒最多50次请求

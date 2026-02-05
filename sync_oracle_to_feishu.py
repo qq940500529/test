@@ -166,7 +166,7 @@ class OracleToFeishuSync:
                 if not records:
                     break
                 
-                # 写入飞书（分小批次，每批最多500条）
+                # 写入飞书（分小批次，每批最多1000条）
                 for i in range(0, len(records), write_batch_size):
                     write_batch = records[i:i + write_batch_size]
                     

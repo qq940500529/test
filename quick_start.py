@@ -64,7 +64,7 @@ def example_custom_config():
         },
         'sync': {
             'read_batch_size': 1000,
-            'write_batch_size': 500,
+            'write_batch_size': 1000,
             'checkpoint_file': 'my_checkpoint.json',
             'max_requests_per_second': 50
         }

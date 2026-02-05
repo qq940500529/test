@@ -295,7 +295,13 @@ class OracleDataReader:
                     # 如果启用UTC到+8时区转换
                     if self.convert_utc_to_utc8:
                         value = self.convert_utc_datetime_to_utc8(value)
-                    value = value.isoformat()  # 转换为ISO格式字符串
+                    # 转换为毫秒级时间戳（飞书API要求）/ Convert to millisecond timestamp (required by Feishu API)
+                    try:
+                        value = int(value.timestamp() * 1000)
+                    except (OSError, OverflowError) as e:
+                        logger.warning(f"无法转换日期时间为时间戳 / Failed to convert datetime to timestamp: {value}, error: {e}")
+                        # 对于超出范围的日期，设置为None
+                        value = None
                 record[col] = value
             records.append(record)
         
