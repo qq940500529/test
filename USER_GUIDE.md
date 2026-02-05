@@ -71,17 +71,21 @@ tail -f sync.log
 
 ## 核心功能说明 (Core Features)
 
-### 0. 自动字段匹配与表创建 (Auto Field Matching and Table Creation)
+### 0. 程序化字段匹配与表创建 (Programmatic Field Matching and Table Creation)
 
-**新特性**: 现在可以不提供 `base_table_id`，系统会根据Oracle表结构自动创建飞书表。
+**重要说明**: 飞书本身不会自动匹配字段，所有字段匹配、类型转换和表创建都由本程序完成。
 
-- **自动字段匹配**: 读取Oracle表的字段架构（字段名和类型），在飞书中创建对应的字段
-- **字段类型映射**: 自动将Oracle字段类型映射到飞书字段类型
+**新特性**: 现在可以不提供 `base_table_id`，程序会根据Oracle表结构自动创建飞书表。
+
+- **程序读取架构**: 程序连接Oracle数据库，查询表的字段架构（字段名和类型）
+- **程序进行映射**: 程序内部实现了Oracle到飞书的字段类型映射规则
+- **程序创建字段**: 程序调用飞书API创建表和字段，不依赖飞书自动匹配
+- **字段类型映射规则**（程序内置）:
   - Oracle NUMBER/INTEGER → 飞书数字（Number）
   - Oracle DATE/TIMESTAMP → 飞书日期（Date）
   - Oracle VARCHAR2/CHAR/CLOB → 飞书文本（Text）
-- **一一对应**: 飞书表的字段与Oracle表的字段完全对应，字段名保持一致
-- **自动创建表**: 如果配置中没有 `base_table_id`，系统会自动创建表并匹配所有字段
+- **一一对应**: 程序确保飞书表的字段与Oracle表的字段完全对应，字段名保持一致
+- **自动创建表**: 如果配置中没有 `base_table_id`，程序会自动创建表并匹配所有字段
 - **向后兼容**: 仍然支持提供 `base_table_id` 的传统方式
 
 **配置方式**:
@@ -96,18 +100,18 @@ feishu:
 ```
 
 **工作原理**:
-1. 连接Oracle数据库，读取表的完整字段架构（包括字段名和数据类型）
-2. 根据Oracle字段类型自动映射到飞书字段类型
-3. 自动创建表 `DataSync_001` 并添加所有对应的字段
-4. 开始数据同步，字段一一对应
+1. 程序连接Oracle数据库，查询 `user_tab_columns` 获取表的完整字段架构（包括字段名和数据类型）
+2. 程序内部根据Oracle字段类型自动映射到飞书字段类型（使用 `map_oracle_type_to_feishu()` 方法）
+3. 程序调用飞书API创建表 `DataSync_001` 并添加所有对应的字段
+4. 程序开始数据同步，字段一一对应
 
 **示例**:
 如果Oracle表有以下字段：
-- ID (NUMBER) → 飞书数字字段 ID
-- NAME (VARCHAR2) → 飞书文本字段 NAME
-- CREATED_AT (TIMESTAMP) → 飞书日期字段 CREATED_AT
+- ID (NUMBER) → 程序映射为飞书数字字段 ID
+- NAME (VARCHAR2) → 程序映射为飞书文本字段 NAME
+- CREATED_AT (TIMESTAMP) → 程序映射为飞书日期字段 CREATED_AT
 
-飞书表将自动创建完全对应的字段。
+程序会在飞书中创建完全对应的字段。
 
 ### 1. 时区转换 (Timezone Conversion)
 

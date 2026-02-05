@@ -3,19 +3,25 @@
 ## 需求 (Requirements)
 
 1. ✅ 可自动进行字段和字段类型匹配，新建对应字段。飞书不使用初始数据表，但是有多维表格，根据字段匹配自动新建，所以不应提供表ID。
+   - **注意**: 飞书本身不会自动匹配字段，是程序进行字段匹配和创建
 2. ✅ 按照查询到的Oracle表的字段，创建对应的多维表格数据表及其字段，做到两者对应
 3. ✅ Oracle中存储的是UTC时间，将其转换为+8时间
 4. ✅ 检查确认对Oracle只有查询，没有增删改
 
 ## 实现功能 (Implemented Features)
 
-### 1. 自动字段匹配和表创建
+### 1. 程序化字段匹配和表创建
 
 **核心实现**:
-- `get_table_schema()`: 从Oracle数据字典获取表的完整架构（字段名、类型、精度等）
-- `map_oracle_type_to_feishu()`: 自动将Oracle字段类型映射到飞书字段类型
-- `create_table_from_oracle_schema()`: 根据Oracle架构创建飞书表
-- `base_table_id` 改为可选配置，不提供时自动创建表
+- `get_table_schema()`: 程序从Oracle数据字典获取表的完整架构（字段名、类型、精度等）
+- `map_oracle_type_to_feishu()`: 程序自动将Oracle字段类型映射到飞书字段类型
+- `create_table_from_oracle_schema()`: 程序根据Oracle架构调用飞书API创建表
+- `base_table_id` 改为可选配置，不提供时程序自动创建表
+
+**重要说明**: 
+- 飞书本身不会自动匹配字段
+- 所有字段匹配和类型映射都由程序完成
+- 程序通过调用飞书API来创建表和字段
 
 **字段类型映射**:
 ```
@@ -26,10 +32,10 @@ VARCHAR2/CHAR/CLOB/NCLOB        →  文本 (Text)
 ```
 
 **工作流程**:
-1. 连接Oracle数据库，读取表的字段架构
-2. 根据Oracle字段类型映射到飞书字段类型
-3. 自动创建飞书表（如：DataSync_001），字段与Oracle完全对应
-4. 开始数据同步
+1. 程序连接Oracle数据库，读取表的字段架构
+2. 程序根据Oracle字段类型映射到飞书字段类型（程序内置映射规则）
+3. 程序调用飞书API创建表（如：DataSync_001），字段与Oracle完全对应
+4. 程序开始数据同步
 
 ### 2. UTC到UTC+8时区转换
 

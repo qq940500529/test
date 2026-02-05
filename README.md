@@ -6,10 +6,10 @@
 
 - ✅ **Oracle数据库读取**: 批量读取Oracle数据表，支持百万级数据
 - ✅ **飞书API集成**: 使用官方飞书SDK (lark-oapi) 连接
-- ✅ **自动字段匹配**: 根据Oracle表的字段结构自动创建飞书表字段，实现一一对应
-- ✅ **自动表创建**: 可选提供初始表ID，如不提供将根据Oracle表结构自动创建表
-- ✅ **字段类型映射**: 自动将Oracle字段类型（VARCHAR2、NUMBER、DATE等）映射到飞书字段类型
-- ✅ **时区转换**: 自动将Oracle中的UTC时间转换为东八区时间（北京时间，UTC+8）
+- ✅ **程序化字段匹配**: 程序自动读取Oracle表结构，进行字段类型映射，在飞书中创建对应字段
+- ✅ **自动表创建**: 可选提供初始表ID，如不提供程序将根据Oracle表结构自动创建表
+- ✅ **智能类型映射**: 程序自动将Oracle字段类型（VARCHAR2、NUMBER、DATE等）映射到飞书字段类型
+- ✅ **时区转换**: 程序自动将Oracle中的UTC时间转换为东八区时间（北京时间，UTC+8）
 - ✅ **速率限制**: 遵守飞书API限制（每秒50次请求，每批次500条记录）
 - ✅ **自动表管理**: 当数据超过2万行时自动创建新表，表名包含序号
 - ✅ **断点续传**: 支持中断后恢复，避免重复同步
@@ -149,29 +149,56 @@ python sync_oracle_to_feishu.py --reset-checkpoint
 
 ## 工作原理 (How It Works)
 
-### 1. 数据读取流程
+### 1. 程序化字段匹配流程
+
+**注意**: 飞书本身不会自动匹配字段，所有字段匹配和创建都由本程序完成。
+
+```
+第一步：读取Oracle表结构
+Oracle Database
+    ↓ (程序查询 user_tab_columns)
+程序获取字段信息:
+  - 字段名: ID, NAME, CREATED_AT
+  - 字段类型: NUMBER, VARCHAR2, TIMESTAMP
+    ↓
+第二步：程序进行类型映射
+程序内部映射规则:
+  - NUMBER → 飞书数字类型
+  - VARCHAR2 → 飞书文本类型
+  - TIMESTAMP → 飞书日期类型
+    ↓
+第三步：程序创建飞书表
+程序调用飞书API创建表:
+  - 创建表: DataSync_001
+  - 创建字段: ID(数字), NAME(文本), CREATED_AT(日期)
+    ↓
+第四步：数据同步
+程序读取Oracle数据并写入飞书
+```
+
+### 2. 数据读取流程
 
 ```
 Oracle Database
-    ↓ (批量读取，按sync_column排序)
+    ↓ (程序批量读取，按sync_column排序)
 Batch Processing (1000条/批)
     ↓
 Memory Buffer
 ```
 
-### 2. 数据写入流程
+### 3. 数据写入流程
 
 ```
 Memory Buffer
-    ↓ (分批500条)
+    ↓ (程序分批500条)
 Feishu API (Rate Limited: 50 req/s)
     ↓
-Current Table (检查行数)
+Current Table (程序检查行数)
     ↓
-如果超过20000行 → 创建新表 (表名_001, _002...)
+如果超过20000行 → 程序创建新表 (表名_001, _002...)
 ```
 
-### 3. 断点续传机制
+### 4. 断点续传机制
 
 ```json
 {

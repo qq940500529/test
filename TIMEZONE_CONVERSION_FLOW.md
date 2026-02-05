@@ -3,8 +3,16 @@
 ## 需求确认 (Requirement Confirmation)
 
 **Oracle存储方式**: 以常规日期方式存储UTC时间
-**飞书输入方式**: 输入对应的+8时间（北京时间）
-**重要**: 不更改Oracle中的记录
+**飞书输入方式**: 程序将时间转换为+8时间（北京时间）后输入飞书
+**重要**: 不更改Oracle中的记录，程序只读取Oracle数据
+
+## 字段匹配说明 (Field Matching Explanation)
+
+**重要**: 飞书本身不会自动匹配字段，所有字段匹配和类型转换都由本程序完成：
+- 程序读取Oracle表结构
+- 程序进行类型映射（Oracle类型 → 飞书类型）
+- 程序调用飞书API创建字段
+- 程序进行数据同步
 
 ## 当前实现流程 (Current Implementation Flow)
 
