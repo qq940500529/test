@@ -295,7 +295,8 @@ class OracleDataReader:
                     # 如果启用UTC到+8时区转换
                     if self.convert_utc_to_utc8:
                         value = self.convert_utc_datetime_to_utc8(value)
-                    value = value.isoformat()  # 转换为ISO格式字符串
+                    # 转换为毫秒级时间戳（飞书API要求）/ Convert to millisecond timestamp (required by Feishu API)
+                    value = int(value.timestamp() * 1000)
                 record[col] = value
             records.append(record)
         
