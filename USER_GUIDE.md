@@ -35,7 +35,7 @@ feishu:
   app_id: "cli_xxxxx"            # 飞书应用ID
   app_secret: "xxxxx"            # 飞书应用密钥
   app_token: "xxxxx"             # 多维表格token
-  base_table_id: "xxxxx"         # 初始数据表ID
+  base_table_id: "xxxxx"         # 初始数据表ID（可选 - 不提供将自动创建）
   table_name_prefix: "DataSync"  # 表名前缀
   max_rows_per_table: 20000      # 每表最大行数
 ```
@@ -69,6 +69,44 @@ tail -f sync.log
 ```
 
 ## 核心功能说明 (Core Features)
+
+### 0. 自动字段匹配与表创建 (Auto Field Matching and Table Creation)
+
+**新特性**: 现在可以不提供 `base_table_id`，系统会根据Oracle表结构自动创建飞书表。
+
+- **自动字段匹配**: 读取Oracle表的字段架构（字段名和类型），在飞书中创建对应的字段
+- **字段类型映射**: 自动将Oracle字段类型映射到飞书字段类型
+  - Oracle NUMBER/INTEGER → 飞书数字（Number）
+  - Oracle DATE/TIMESTAMP → 飞书日期（Date）
+  - Oracle VARCHAR2/CHAR/CLOB → 飞书文本（Text）
+- **一一对应**: 飞书表的字段与Oracle表的字段完全对应，字段名保持一致
+- **自动创建表**: 如果配置中没有 `base_table_id`，系统会自动创建表并匹配所有字段
+- **向后兼容**: 仍然支持提供 `base_table_id` 的传统方式
+
+**配置方式**:
+```yaml
+feishu:
+  app_id: "cli_xxxxx"
+  app_secret: "xxxxx"
+  app_token: "xxxxx"
+  # base_table_id: "xxxxx"  # 注释掉或删除此行以启用自动创建
+  table_name_prefix: "DataSync"
+  max_rows_per_table: 20000
+```
+
+**工作原理**:
+1. 连接Oracle数据库，读取表的完整字段架构（包括字段名和数据类型）
+2. 根据Oracle字段类型自动映射到飞书字段类型
+3. 自动创建表 `DataSync_001` 并添加所有对应的字段
+4. 开始数据同步，字段一一对应
+
+**示例**:
+如果Oracle表有以下字段：
+- ID (NUMBER) → 飞书数字字段 ID
+- NAME (VARCHAR2) → 飞书文本字段 NAME
+- CREATED_AT (TIMESTAMP) → 飞书日期字段 CREATED_AT
+
+飞书表将自动创建完全对应的字段。
 
 ### 1. 断点续传 (Resumable Transfer)
 

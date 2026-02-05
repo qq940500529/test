@@ -107,8 +107,12 @@ class OracleToFeishuSync:
             sync_column = self.config['oracle']['sync_column']  # 同步列（用于增量）
             primary_key = self.config['oracle']['primary_key']  # 主键
             
+            # 获取Oracle表的完整架构（字段名和类型）
+            oracle_schema = self.oracle_reader.get_table_schema(table_name)
+            logger.info(f"获取到Oracle表架构 / Retrieved Oracle table schema with {len(oracle_schema)} columns")
+            
             # 获取列名
-            columns = self.oracle_reader.get_table_columns(table_name)
+            columns = [col['column_name'] for col in oracle_schema]
             logger.info(f"表列 / Table columns: {', '.join(columns)}")
             
             # 构建增量同步参数
@@ -131,8 +135,13 @@ class OracleToFeishuSync:
             
             # 初始化飞书表跟踪
             current_table_sequence = checkpoint.get('current_table_sequence', 1)
-            current_table_id = checkpoint.get('current_table_id') or self.feishu_client.base_table_id
-            self.feishu_client.current_table_id = current_table_id
+            current_table_id = checkpoint.get('current_table_id')
+            # Only set current_table_id if it exists, otherwise let auto-creation happen
+            # 只在存在时设置current_table_id，否则让自动创建发生
+            if current_table_id:
+                self.feishu_client.current_table_id = current_table_id
+            elif self.feishu_client.base_table_id:
+                self.feishu_client.current_table_id = self.feishu_client.base_table_id
             
             # 批量同步数据
             batch_size = self.config['sync']['read_batch_size']  # Oracle读取批次大小
@@ -161,10 +170,11 @@ class OracleToFeishuSync:
                 for i in range(0, len(records), write_batch_size):
                     write_batch = records[i:i + write_batch_size]
                     
-                    # 写入记录并管理表切换
+                    # 写入记录并管理表切换（传递Oracle架构）
                     result = self.feishu_client.write_records_with_table_management(
                         write_batch,
-                        current_table_sequence
+                        current_table_sequence,
+                        oracle_schema=oracle_schema
                     )
                     
                     # 更新跟踪信息

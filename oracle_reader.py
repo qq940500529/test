@@ -114,6 +114,43 @@ class OracleDataReader:
         logger.info(f"在表 {table_name} 中找到 {len(columns)} 列 / Found {len(columns)} columns in table {table_name}")
         return columns
     
+    def get_table_schema(self, table_name: str) -> List[Dict[str, Any]]:
+        """
+        Get column schema (names and types) from table
+        获取表的字段架构（名称和类型）
+        
+        Args:
+            table_name: Name of the table / 表名
+            
+        Returns:
+            List of column definitions with name and data_type / 包含名称和数据类型的列定义列表
+        """
+        # 验证表名以防止SQL注入
+        _validate_sql_identifier(table_name)
+        
+        # 使用参数化查询获取字段信息
+        query = """
+            SELECT column_name, data_type, data_length, data_precision, data_scale
+            FROM user_tab_columns 
+            WHERE table_name = UPPER(:table_name)
+            ORDER BY column_id
+        """
+        self.cursor.execute(query, table_name=table_name)
+        
+        columns_info = []
+        for row in self.cursor.fetchall():
+            column_info = {
+                'column_name': row[0],
+                'data_type': row[1],
+                'data_length': row[2],
+                'data_precision': row[3],
+                'data_scale': row[4]
+            }
+            columns_info.append(column_info)
+        
+        logger.info(f"获取到表 {table_name} 的 {len(columns_info)} 个字段架构 / Retrieved schema for {len(columns_info)} columns in table {table_name}")
+        return columns_info
+    
     def get_total_count(self, table_name: str, sync_column: str = None, last_sync_value: Any = None) -> int:
         """
         Get total record count

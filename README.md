@@ -6,6 +6,9 @@
 
 - ✅ **Oracle数据库读取**: 批量读取Oracle数据表，支持百万级数据
 - ✅ **飞书API集成**: 使用官方飞书SDK (lark-oapi) 连接
+- ✅ **自动字段匹配**: 根据Oracle表的字段结构自动创建飞书表字段，实现一一对应
+- ✅ **自动表创建**: 可选提供初始表ID，如不提供将根据Oracle表结构自动创建表
+- ✅ **字段类型映射**: 自动将Oracle字段类型（VARCHAR2、NUMBER、DATE等）映射到飞书字段类型
 - ✅ **速率限制**: 遵守飞书API限制（每秒50次请求，每批次500条记录）
 - ✅ **自动表管理**: 当数据超过2万行时自动创建新表，表名包含序号
 - ✅ **断点续传**: 支持中断后恢复，避免重复同步
@@ -50,7 +53,7 @@ https://python-oracledb.readthedocs.io/
 
 1. 在飞书中创建一个多维表格（Bitable）
 2. 获取多维表格的 `app_token` (在URL中)
-3. 创建一个基础数据表，获取 `table_id`
+3. **(可选)** 如果需要使用现有表，可以获取 `table_id`。如果不提供，系统将根据字段自动创建表。
 
 ### 3. 配置文件
 
@@ -73,7 +76,7 @@ feishu:
   app_id: "cli_xxxxx"
   app_secret: "xxxxx"
   app_token: "xxxxx"         # 多维表格app_token
-  base_table_id: "xxxxx"     # 初始数据表ID
+  base_table_id: "xxxxx"     # 初始数据表ID（可选，如不提供将自动创建）
   table_name_prefix: "DataSync"
   max_rows_per_table: 20000
 
@@ -204,12 +207,16 @@ Current Table (检查行数)
 
 ## 注意事项 (Notes)
 
-1. **数据类型映射**: 程序会自动推断Oracle字段类型并映射到飞书字段类型
-2. **大对象处理**: LOB类型会被读取为文本
-3. **时间格式**: 时间字段会转换为ISO 8601格式
-4. **表命名规则**: 新表命名格式为 `{prefix}_{序号:03d}` (如: DataSync_001)
-5. **速率限制**: 内置速率限制器确保不超过飞书API限制
-6. **错误重试**: 建议在外部（如cron）实现失败重试机制
+1. **字段类型映射**: 程序会自动根据Oracle字段类型映射到飞书字段类型：
+   - Oracle NUMBER/INTEGER → 飞书数字
+   - Oracle DATE/TIMESTAMP → 飞书日期
+   - Oracle VARCHAR2/CHAR/CLOB → 飞书文本
+2. **字段对应**: 飞书表的字段与Oracle表的字段完全对应，字段名保持一致
+3. **大对象处理**: LOB类型会被读取为文本
+4. **时间格式**: 时间字段会转换为ISO 8601格式
+5. **表命名规则**: 新表命名格式为 `{prefix}_{序号:03d}` (如: DataSync_001)
+6. **速率限制**: 内置速率限制器确保不超过飞书API限制
+7. **错误重试**: 建议在外部（如cron）实现失败重试机制
 
 ## 故障排查 (Troubleshooting)
 
