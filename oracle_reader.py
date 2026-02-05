@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 # 东八区时区 (+8小时)
 TIMEZONE_UTC8 = timezone(timedelta(hours=8))
 
+# Oracle日期/时间戳类型常量
+# Oracle DATE/TIMESTAMP types constants
+_DATE_TYPES = ('DATE', 'TIMESTAMP')
+
 
 def _validate_sql_identifier(identifier: str) -> bool:
     """
@@ -56,6 +60,8 @@ class OracleDataReader:
         self.cursor = None  # 游标对象
         # 是否启用UTC到+8时区转换（默认启用）
         self.convert_utc_to_utc8 = config.get('convert_utc_to_utc8', True)
+        # 缓存表的架构信息（用于类型检查）
+        self._table_schemas = {}  # {table_name: {column_name: data_type}}
         
     def connect(self):
         """
@@ -121,6 +127,78 @@ class OracleDataReader:
         
         return dt_utc8
     
+    def _get_column_type(self, table_name: str, column_name: str) -> Optional[str]:
+        """
+        Get the data type of a column
+        获取列的数据类型
+        
+        Args:
+            table_name: Name of the table / 表名
+            column_name: Name of the column / 列名
+            
+        Returns:
+            Data type string or None if not found / 数据类型字符串，如果未找到则为None
+        """
+        if table_name not in self._table_schemas:
+            # Schema not cached, fetch it
+            # 架构未缓存，获取它
+            self.get_table_schema(table_name)
+        
+        return self._table_schemas.get(table_name, {}).get(column_name)
+    
+    def _convert_timestamp_to_date(self, timestamp_ms: int) -> datetime:
+        """
+        Convert millisecond timestamp to datetime object
+        将毫秒时间戳转换为datetime对象
+        
+        Args:
+            timestamp_ms: Timestamp in milliseconds / 毫秒时间戳
+            
+        Returns:
+            Datetime object / datetime对象
+        """
+        # Convert milliseconds to seconds
+        # 将毫秒转换为秒
+        timestamp_sec = timestamp_ms / 1000
+        return datetime.fromtimestamp(timestamp_sec, tz=timezone.utc)
+    
+    def _prepare_sync_value_for_query(self, table_name: str, sync_column: str, last_sync_value: Any) -> Any:
+        """
+        Prepare sync value for use in Oracle query
+        准备用于Oracle查询的同步值
+        
+        If the sync column is a DATE type and the value is a numeric timestamp,
+        convert it to a datetime object for proper Oracle comparison.
+        如果同步列是DATE类型且值是数字时间戳，则将其转换为datetime对象以便在Oracle中正确比较。
+        
+        Args:
+            table_name: Name of the table / 表名
+            sync_column: Name of the sync column / 同步列名
+            last_sync_value: The value to prepare / 要准备的值
+            
+        Returns:
+            Prepared value for Oracle query / 准备好用于Oracle查询的值
+        """
+        if last_sync_value is None:
+            return None
+        
+        # Get the column type
+        # 获取列类型
+        column_type = self._get_column_type(table_name, sync_column)
+        
+        # If it's a DATE or TIMESTAMP type and the value is numeric (millisecond timestamp)
+        # 如果是DATE或TIMESTAMP类型且值是数字（毫秒时间戳）
+        # Check if column_type is DATE or starts with TIMESTAMP to handle all precision variants
+        # 检查是否为DATE或以TIMESTAMP开头，以处理所有精度变体
+        is_date_type = column_type in _DATE_TYPES or (column_type and column_type.startswith('TIMESTAMP'))
+        
+        if is_date_type and isinstance(last_sync_value, (int, float)):
+            # Convert millisecond timestamp to datetime
+            # 将毫秒时间戳转换为datetime
+            return self._convert_timestamp_to_date(last_sync_value)
+        
+        return last_sync_value
+    
     def get_table_columns(self, table_name: str) -> List[str]:
         """
         Get column names from table
@@ -183,6 +261,13 @@ class OracleDataReader:
             columns_info.append(column_info)
         
         logger.info(f"获取到表 {table_name} 的 {len(columns_info)} 个字段架构 / Retrieved schema for {len(columns_info)} columns in table {table_name}")
+        
+        # 缓存架构信息以便快速查询列类型
+        # Cache schema information for quick column type lookup
+        self._table_schemas[table_name] = {
+            col['column_name']: col['data_type'] for col in columns_info
+        }
+        
         return columns_info
     
     def get_total_count(self, table_name: str, sync_column: str = None, last_sync_value: Any = None) -> int:
@@ -206,9 +291,11 @@ class OracleDataReader:
         # 使用参数化查询防止SQL注入
         # Use parameterized query to prevent SQL injection
         if sync_column and last_sync_value is not None:
-            # 对于增量同步，使用参数化查询
+            # 对于增量同步，准备同步值（如果是DATE类型则转换时间戳）
+            # For incremental sync, prepare sync value (convert timestamp if DATE type)
+            prepared_value = self._prepare_sync_value_for_query(table_name, sync_column, last_sync_value)
             query = f"SELECT COUNT(*) FROM {table_name} WHERE {sync_column} > :last_value"
-            self.cursor.execute(query, last_value=last_sync_value)
+            self.cursor.execute(query, last_value=prepared_value)
         else:
             query = f"SELECT COUNT(*) FROM {table_name}"
             self.cursor.execute(query)
@@ -259,8 +346,11 @@ class OracleDataReader:
         # 构建WHERE条件（使用参数化查询）
         params = {}
         if sync_column and last_sync_value is not None:
+            # 准备同步值（如果是DATE类型则转换时间戳）
+            # Prepare sync value (convert timestamp if DATE type)
+            prepared_value = self._prepare_sync_value_for_query(table_name, sync_column, last_sync_value)
             base_query += f" WHERE {sync_column} > :last_value"
-            params['last_value'] = last_sync_value
+            params['last_value'] = prepared_value
         
         # 添加排序（如果有）
         if order_by:
