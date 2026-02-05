@@ -1,0 +1,40 @@
+# Oracle to Feishu Data Sync Configuration
+# Oracle到飞书数据同步配置
+
+# Oracle Database Configuration / Oracle数据库配置
+oracle:
+  host: "localhost"  # 数据库主机地址
+  port: 1521  # 数据库端口
+  service_name: "ORCL"  # 服务名
+  username: "your_username"  # 用户名
+  password: "your_password"  # 密码
+  table_name: "YOUR_TABLE_NAME"  # 要同步的表名
+  # Primary key column for tracking progress / 用于跟踪进度的主键列
+  primary_key: "ID"
+  # Column to track last sync (timestamp or incrementing ID) / 用于跟踪最后同步的列（时间戳或递增ID）
+  sync_column: "UPDATED_AT"
+
+# Feishu (Lark) Configuration / 飞书配置
+feishu:
+  # App credentials from Feishu Open Platform / 从飞书开放平台获取的应用凭证
+  app_id: "your_app_id"  # 应用ID
+  app_secret: "your_app_secret"  # 应用密钥
+  # Multi-dimensional table (bitable) app token / 多维表格app_token
+  app_token: "your_app_token"
+  # Base table ID (will create new tables when limit reached) / 基础表ID（达到限制时会创建新表）
+  base_table_id: "your_table_id"
+  # Table name prefix for new tables / 新表的表名前缀
+  table_name_prefix: "DataSync"
+  # Max rows per table (Feishu limit is 20000) / 每表最大行数（飞书限制为20000）
+  max_rows_per_table: 20000
+
+# Sync Configuration / 同步配置
+sync:
+  # Batch size for reading from Oracle (recommend 1000-5000) / 从Oracle读取的批次大小（建议1000-5000）
+  read_batch_size: 1000
+  # Batch size for writing to Feishu (max 500 per API limit) / 写入飞书的批次大小（API限制最多500）
+  write_batch_size: 500
+  # Checkpoint file to track sync progress / 用于跟踪同步进度的检查点文件
+  checkpoint_file: "sync_checkpoint.json"
+  # Rate limiting: max 50 requests per second / 速率限制：每秒最多50次请求
+  max_requests_per_second: 50
