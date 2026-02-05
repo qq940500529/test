@@ -208,8 +208,14 @@ class FeishuClient:
     
     def ensure_table_exists(self, sample_record: Dict[str, Any], sequence_number: int = 1) -> str:
         """
-        Ensure a table exists, creating it if needed (for when base_table_id is not provided)
-        确保表存在，如需要则创建（用于未提供base_table_id的情况）
+        Ensure a table exists, creating it if needed (fallback when oracle_schema is not available)
+        确保表存在，如需要则创建（当oracle_schema不可用时的回退方法）
+        
+        Note:
+            This is a fallback method that infers field types from sample data values.
+            Prefer using create_table_from_oracle_schema() when Oracle schema is available.
+            这是从样本数据值推断字段类型的回退方法。
+            当Oracle架构可用时，优先使用create_table_from_oracle_schema()。
         
         Args:
             sample_record: Sample record to infer field types / 用于推断字段类型的样本记录

@@ -103,6 +103,11 @@ class OracleDataReader:
             
         Returns:
             Datetime in UTC+8 timezone / 东八区时间对象
+            
+        Note:
+            If the datetime object has no timezone info (tzinfo is None), 
+            it is assumed to be in UTC timezone.
+            如果时间对象没有时区信息（tzinfo为None），则假定为UTC时区。
         """
         if dt is None:
             return None

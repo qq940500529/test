@@ -56,7 +56,27 @@ https://python-oracledb.readthedocs.io/
 2. 获取多维表格的 `app_token` (在URL中)
 3. **(可选)** 如果需要使用现有表，可以获取 `table_id`。如果不提供，系统将根据字段自动创建表。
 
-### 3. 配置文件
+### 3. 配置Oracle数据库权限（推荐）
+
+建议为同步程序创建只读权限的Oracle用户：
+
+```sql
+-- 创建只读用户
+CREATE USER sync_readonly IDENTIFIED BY "strong_password";
+
+-- 授予连接权限
+GRANT CREATE SESSION TO sync_readonly;
+
+-- 授予特定表的SELECT权限
+GRANT SELECT ON your_schema.your_table TO sync_readonly;
+
+-- 授予访问数据字典的权限（用于获取表结构）
+GRANT SELECT ON sys.user_tab_columns TO sync_readonly;
+```
+
+**注意**: 本程序对Oracle数据库只进行SELECT查询，不会执行任何INSERT/UPDATE/DELETE操作，数据安全有保障。
+
+### 4. 配置文件
 
 复制 `config.yaml` 并修改配置:
 
@@ -215,11 +235,12 @@ Current Table (检查行数)
    - Oracle VARCHAR2/CHAR/CLOB → 飞书文本
 2. **字段对应**: 飞书表的字段与Oracle表的字段完全对应，字段名保持一致
 3. **时区转换**: Oracle中的UTC时间会自动转换为东八区时间（北京时间，UTC+8）
-4. **大对象处理**: LOB类型会被读取为文本
-5. **时间格式**: 时间字段会转换为ISO 8601格式（包含时区信息）
-6. **表命名规则**: 新表命名格式为 `{prefix}_{序号:03d}` (如: DataSync_001)
-7. **速率限制**: 内置速率限制器确保不超过飞书API限制
-8. **错误重试**: 建议在外部（如cron）实现失败重试机制
+4. **只读访问**: 对Oracle数据库只有SELECT查询操作，不会进行任何增删改操作，数据安全有保障
+5. **大对象处理**: LOB类型会被读取为文本
+6. **时间格式**: 时间字段会转换为ISO 8601格式（包含时区信息）
+7. **表命名规则**: 新表命名格式为 `{prefix}_{序号:03d}` (如: DataSync_001)
+8. **速率限制**: 内置速率限制器确保不超过飞书API限制
+9. **错误重试**: 建议在外部（如cron）实现失败重试机制
 
 ## 故障排查 (Troubleshooting)
 
