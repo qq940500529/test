@@ -56,7 +56,7 @@ class FeishuClient:
         self.app_id = config['app_id']  # 应用ID
         self.app_secret = config['app_secret']  # 应用密钥
         self.app_token = config['app_token']  # 多维表格app_token
-        self.base_table_id = config['base_table_id']  # 基础数据表ID
+        self.base_table_id = config.get('base_table_id')  # 基础数据表ID（可选）
         self.table_name_prefix = config.get('table_name_prefix', 'DataSync')  # 表名前缀
         self.max_rows_per_table = config.get('max_rows_per_table', 20000)  # 每表最大行数
         self.max_requests_per_second = config.get('max_requests_per_second', 50)  # 每秒最大请求数
@@ -69,7 +69,7 @@ class FeishuClient:
             .build()
         
         # 跟踪当前表信息
-        self.current_table_id = self.base_table_id  # 当前使用的表ID
+        self.current_table_id = self.base_table_id  # 当前使用的表ID（可以为None）
         self.current_table_row_count = 0  # 当前表的行数
         
         # Rate limiting tracking / 速率限制追踪
@@ -204,6 +204,84 @@ class FeishuClient:
         
         table_id = response.data.table_id
         logger.info(f"创建新表 / Created new table: {table_name} (ID: {table_id})")
+        return table_id
+    
+    def ensure_table_exists(self, sample_record: Dict[str, Any], sequence_number: int = 1) -> str:
+        """
+        Ensure a table exists, creating it if needed (fallback when oracle_schema is not available)
+        确保表存在，如需要则创建（当oracle_schema不可用时的回退方法）
+        
+        Note:
+            This is a fallback method that infers field types from sample data values.
+            Prefer using create_table_from_oracle_schema() when Oracle schema is available.
+            这是从样本数据值推断字段类型的回退方法。
+            当Oracle架构可用时，优先使用create_table_from_oracle_schema()。
+        
+        Args:
+            sample_record: Sample record to infer field types / 用于推断字段类型的样本记录
+            sequence_number: Sequence number for table name / 表名序号
+            
+        Returns:
+            Table ID / 表ID
+        """
+        if self.current_table_id is None:
+            # No table exists yet, create one
+            # 还没有表，创建一个
+            table_name = f"{self.table_name_prefix}_{sequence_number:03d}"
+            
+            # Create fields from sample record
+            # 根据样本记录创建字段
+            fields = []
+            for field_name, value in sample_record.items():
+                field_type = self._infer_field_type(value)
+                fields.append({
+                    "field_name": field_name,
+                    "type": field_type
+                })
+            
+            # Create the table
+            # 创建表
+            self.current_table_id = self.create_table(table_name, fields)
+            self.current_table_row_count = 0
+            logger.info(f"自动创建初始表 / Auto-created initial table: {table_name} (ID: {self.current_table_id})")
+        
+        return self.current_table_id
+    
+    def create_table_from_oracle_schema(self, oracle_columns: List[Dict[str, Any]], sequence_number: int = 1) -> str:
+        """
+        Create a Feishu table based on Oracle table schema
+        根据Oracle表架构创建飞书表
+        
+        Args:
+            oracle_columns: List of Oracle column definitions with column_name and data_type
+                           Oracle列定义列表，包含column_name和data_type
+            sequence_number: Sequence number for table name / 表名序号
+            
+        Returns:
+            Created table ID / 创建的表ID
+        """
+        table_name = f"{self.table_name_prefix}_{sequence_number:03d}"
+        
+        # Map Oracle columns to Feishu fields
+        # 将Oracle列映射到飞书字段
+        fields = []
+        for col in oracle_columns:
+            field_name = col['column_name']
+            oracle_type = col['data_type']
+            feishu_type = self.map_oracle_type_to_feishu(oracle_type)
+            
+            fields.append({
+                "field_name": field_name,
+                "type": feishu_type
+            })
+            
+            logger.info(f"映射字段 / Mapped field: {field_name} ({oracle_type} -> Feishu type {feishu_type})")
+        
+        # Create the table with all fields
+        # 创建包含所有字段的表
+        table_id = self.create_table(table_name, fields)
+        logger.info(f"根据Oracle表架构创建飞书表 / Created Feishu table from Oracle schema: {table_name} (ID: {table_id})")
+        
         return table_id
     
     def list_tables(self) -> List[Dict[str, Any]]:
@@ -359,6 +437,37 @@ class FeishuClient:
         else:
             return FIELD_TYPE_TEXT
     
+    def map_oracle_type_to_feishu(self, oracle_type: str) -> int:
+        """
+        Map Oracle data type to Feishu field type
+        将Oracle数据类型映射到飞书字段类型
+        
+        Args:
+            oracle_type: Oracle data type (e.g., 'VARCHAR2', 'NUMBER', 'DATE') / Oracle数据类型
+            
+        Returns:
+            Feishu field type code / 飞书字段类型代码
+        """
+        # 转换为大写以进行匹配
+        oracle_type_upper = oracle_type.upper()
+        
+        # 数字类型映射
+        if oracle_type_upper in ('NUMBER', 'INTEGER', 'FLOAT', 'BINARY_FLOAT', 'BINARY_DOUBLE', 'DECIMAL', 'NUMERIC'):
+            return FIELD_TYPE_NUMBER
+        
+        # 日期时间类型映射
+        elif oracle_type_upper in ('DATE', 'TIMESTAMP', 'TIMESTAMP(6)', 'TIMESTAMP WITH TIME ZONE', 'TIMESTAMP WITH LOCAL TIME ZONE'):
+            return FIELD_TYPE_DATE
+        
+        # 文本类型映射
+        elif oracle_type_upper in ('VARCHAR', 'VARCHAR2', 'CHAR', 'NCHAR', 'NVARCHAR2', 'CLOB', 'NCLOB', 'LONG'):
+            return FIELD_TYPE_TEXT
+        
+        # 默认为文本类型
+        else:
+            logger.warning(f"未知的Oracle类型 '{oracle_type}'，默认映射为文本类型 / Unknown Oracle type '{oracle_type}', defaulting to TEXT")
+            return FIELD_TYPE_TEXT
+    
     def batch_create_records(
         self, 
         table_id: str, 
@@ -453,7 +562,8 @@ class FeishuClient:
     def write_records_with_table_management(
         self,
         records: List[Dict[str, Any]],
-        table_sequence: int
+        table_sequence: int,
+        oracle_schema: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Write records with automatic table switching when limit reached
@@ -462,6 +572,7 @@ class FeishuClient:
         Args:
             records: Records to write / 要写入的记录
             table_sequence: Current table sequence number / 当前表序号
+            oracle_schema: Oracle table schema for field mapping / 用于字段映射的Oracle表架构
             
         Returns:
             Result summary with table_id and new sequence number / 包含表ID和新序号的结果摘要
@@ -471,6 +582,19 @@ class FeishuClient:
         
         total_written = 0
         current_sequence = table_sequence
+        
+        # Ensure table exists (auto-create if base_table_id not provided)
+        # 确保表存在（如果未提供base_table_id则自动创建）
+        if self.current_table_id is None:
+            if oracle_schema:
+                # Create table based on Oracle schema
+                # 根据Oracle架构创建表
+                self.current_table_id = self.create_table_from_oracle_schema(oracle_schema, current_sequence)
+                self.current_table_row_count = 0
+            else:
+                # Fallback to sample-based creation
+                # 回退到基于样本的创建
+                self.ensure_table_exists(records[0], current_sequence)
         
         # 更新当前表行数
         self.current_table_row_count = self.get_table_row_count(self.current_table_id)
@@ -484,7 +608,15 @@ class FeishuClient:
             if self.current_table_row_count + len(batch) > self.max_rows_per_table:
                 # 创建新表
                 current_sequence += 1
-                self.get_or_create_next_table(records[0], current_sequence)
+                if oracle_schema:
+                    # Use Oracle schema for new table
+                    # 使用Oracle架构创建新表
+                    self.current_table_id = self.create_table_from_oracle_schema(oracle_schema, current_sequence)
+                    self.current_table_row_count = 0
+                else:
+                    # Fallback to existing method
+                    # 回退到现有方法
+                    self.get_or_create_next_table(records[0], current_sequence)
             
             # 确保当前表中存在所需字段（首批或新表）
             if i == 0 or self.current_table_row_count == 0:

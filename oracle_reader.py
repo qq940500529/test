@@ -9,8 +9,12 @@ import oracledb
 import logging
 import re
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
+
+# 东八区时区 (+8小时)
+TIMEZONE_UTC8 = timezone(timedelta(hours=8))
 
 
 def _validate_sql_identifier(identifier: str) -> bool:
@@ -50,6 +54,8 @@ class OracleDataReader:
         self.config = config
         self.connection = None  # 数据库连接对象
         self.cursor = None  # 游标对象
+        # 是否启用UTC到+8时区转换（默认启用）
+        self.convert_utc_to_utc8 = config.get('convert_utc_to_utc8', True)
         
     def connect(self):
         """
@@ -87,6 +93,34 @@ class OracleDataReader:
             self.connection.close()  # 关闭连接
         logger.info("已断开Oracle数据库连接 / Disconnected from Oracle database")
     
+    def convert_utc_datetime_to_utc8(self, dt: datetime) -> datetime:
+        """
+        Convert UTC datetime to UTC+8 timezone
+        将UTC时间转换为东八区时间（+8小时）
+        
+        Args:
+            dt: UTC datetime object / UTC时间对象
+            
+        Returns:
+            Datetime in UTC+8 timezone / 东八区时间对象
+            
+        Note:
+            If the datetime object has no timezone info (tzinfo is None), 
+            it is assumed to be in UTC timezone.
+            如果时间对象没有时区信息（tzinfo为None），则假定为UTC时区。
+        """
+        if dt is None:
+            return None
+        
+        # 如果时间对象没有时区信息，假定为UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        # 转换到东八区
+        dt_utc8 = dt.astimezone(TIMEZONE_UTC8)
+        
+        return dt_utc8
+    
     def get_table_columns(self, table_name: str) -> List[str]:
         """
         Get column names from table
@@ -113,6 +147,43 @@ class OracleDataReader:
         columns = [row[0] for row in self.cursor.fetchall()]
         logger.info(f"在表 {table_name} 中找到 {len(columns)} 列 / Found {len(columns)} columns in table {table_name}")
         return columns
+    
+    def get_table_schema(self, table_name: str) -> List[Dict[str, Any]]:
+        """
+        Get column schema (names and types) from table
+        获取表的字段架构（名称和类型）
+        
+        Args:
+            table_name: Name of the table / 表名
+            
+        Returns:
+            List of column definitions with name and data_type / 包含名称和数据类型的列定义列表
+        """
+        # 验证表名以防止SQL注入
+        _validate_sql_identifier(table_name)
+        
+        # 使用参数化查询获取字段信息
+        query = """
+            SELECT column_name, data_type, data_length, data_precision, data_scale
+            FROM user_tab_columns 
+            WHERE table_name = UPPER(:table_name)
+            ORDER BY column_id
+        """
+        self.cursor.execute(query, table_name=table_name)
+        
+        columns_info = []
+        for row in self.cursor.fetchall():
+            column_info = {
+                'column_name': row[0],
+                'data_type': row[1],
+                'data_length': row[2],
+                'data_precision': row[3],
+                'data_scale': row[4]
+            }
+            columns_info.append(column_info)
+        
+        logger.info(f"获取到表 {table_name} 的 {len(columns_info)} 个字段架构 / Retrieved schema for {len(columns_info)} columns in table {table_name}")
+        return columns_info
     
     def get_total_count(self, table_name: str, sync_column: str = None, last_sync_value: Any = None) -> int:
         """
@@ -221,6 +292,9 @@ class OracleDataReader:
                 if isinstance(value, oracledb.LOB):
                     value = value.read()  # LOB类型读取为文本
                 elif hasattr(value, 'isoformat'):  # 日期时间对象
+                    # 如果启用UTC到+8时区转换
+                    if self.convert_utc_to_utc8:
+                        value = self.convert_utc_datetime_to_utc8(value)
                     value = value.isoformat()  # 转换为ISO格式字符串
                 record[col] = value
             records.append(record)

@@ -30,12 +30,13 @@ oracle:
   table_name: "YOUR_TABLE"       # 表名
   primary_key: "ID"              # 主键列
   sync_column: "UPDATED_AT"      # 增量同步列
+  convert_utc_to_utc8: true      # UTC到+8时区转换（默认启用）
 
 feishu:
   app_id: "cli_xxxxx"            # 飞书应用ID
   app_secret: "xxxxx"            # 飞书应用密钥
   app_token: "xxxxx"             # 多维表格token
-  base_table_id: "xxxxx"         # 初始数据表ID
+  base_table_id: "xxxxx"         # 初始数据表ID（可选 - 不提供将自动创建）
   table_name_prefix: "DataSync"  # 表名前缀
   max_rows_per_table: 20000      # 每表最大行数
 ```
@@ -70,7 +71,74 @@ tail -f sync.log
 
 ## 核心功能说明 (Core Features)
 
-### 1. 断点续传 (Resumable Transfer)
+### 0. 程序化字段匹配与表创建 (Programmatic Field Matching and Table Creation)
+
+**重要说明**: 飞书本身不会自动匹配字段，所有字段匹配、类型转换和表创建都由本程序完成。
+
+**新特性**: 现在可以不提供 `base_table_id`，程序会根据Oracle表结构自动创建飞书表。
+
+- **程序读取架构**: 程序连接Oracle数据库，查询表的字段架构（字段名和类型）
+- **程序进行映射**: 程序内部实现了Oracle到飞书的字段类型映射规则
+- **程序创建字段**: 程序调用飞书API创建表和字段，不依赖飞书自动匹配
+- **字段类型映射规则**（程序内置）:
+  - Oracle NUMBER/INTEGER → 飞书数字（Number）
+  - Oracle DATE/TIMESTAMP → 飞书日期（Date）
+  - Oracle VARCHAR2/CHAR/CLOB → 飞书文本（Text）
+- **一一对应**: 程序确保飞书表的字段与Oracle表的字段完全对应，字段名保持一致
+- **自动创建表**: 如果配置中没有 `base_table_id`，程序会自动创建表并匹配所有字段
+- **向后兼容**: 仍然支持提供 `base_table_id` 的传统方式
+
+**配置方式**:
+```yaml
+feishu:
+  app_id: "cli_xxxxx"
+  app_secret: "xxxxx"
+  app_token: "xxxxx"
+  # base_table_id: "xxxxx"  # 注释掉或删除此行以启用自动创建
+  table_name_prefix: "DataSync"
+  max_rows_per_table: 20000
+```
+
+**工作原理**:
+1. 程序连接Oracle数据库，查询 `user_tab_columns` 获取表的完整字段架构（包括字段名和数据类型）
+2. 程序内部根据Oracle字段类型自动映射到飞书字段类型（使用 `map_oracle_type_to_feishu()` 方法）
+3. 程序调用飞书API创建表 `DataSync_001` 并添加所有对应的字段
+4. 程序开始数据同步，字段一一对应
+
+**示例**:
+如果Oracle表有以下字段：
+- ID (NUMBER) → 程序映射为飞书数字字段 ID
+- NAME (VARCHAR2) → 程序映射为飞书文本字段 NAME
+- CREATED_AT (TIMESTAMP) → 程序映射为飞书日期字段 CREATED_AT
+
+程序会在飞书中创建完全对应的字段。
+
+### 1. 时区转换 (Timezone Conversion)
+
+**重要特性**: Oracle中存储的UTC时间会自动转换为东八区时间（北京时间，UTC+8）。
+
+- **自动转换**: 所有日期/时间字段会自动进行时区转换
+- **配置选项**: 可通过配置文件控制是否启用时区转换
+- **时间格式**: 转换后的时间采用ISO 8601格式，包含时区信息
+
+**配置方式**:
+```yaml
+oracle:
+  # ... 其他配置 ...
+  convert_utc_to_utc8: true  # 启用UTC到+8时区转换（默认）
+  # convert_utc_to_utc8: false  # 禁用时区转换，保持原始UTC时间
+```
+
+**转换示例**:
+- Oracle UTC时间: `2024-01-01 00:00:00` (UTC)
+- 转换后时间: `2024-01-01T08:00:00+08:00` (北京时间)
+
+**注意事项**:
+1. 只有日期/时间类型字段会被转换（DATE, TIMESTAMP等）
+2. 文本、数字等其他类型字段不受影响
+3. 如果Oracle中的时间已经是本地时间，请设置 `convert_utc_to_utc8: false`
+
+### 2. 断点续传 (Resumable Transfer)
 
 程序使用检查点文件 `sync_checkpoint.json` 记录同步进度：
 - 最后同步的数据值
@@ -80,7 +148,7 @@ tail -f sync.log
 
 如果同步中断，下次运行时会自动从上次中断的位置继续。
 
-### 2. 增量同步 (Incremental Sync)
+### 3. 增量同步 (Incremental Sync)
 
 通过配置 `sync_column`（如时间戳或递增ID），程序只同步新增或更新的数据：
 
@@ -89,7 +157,7 @@ tail -f sync.log
 SELECT * FROM table WHERE UPDATED_AT > '上次同步值'
 ```
 
-### 3. 自动表管理 (Automatic Table Management)
+### 4. 自动表管理 (Automatic Table Management)
 
 当数据超过2万行（飞书限制）时，自动创建新表：
 - DataSync_001 (前2万行)
@@ -97,13 +165,13 @@ SELECT * FROM table WHERE UPDATED_AT > '上次同步值'
 - DataSync_003 (4万-6万行)
 - ...
 
-### 4. 速率限制 (Rate Limiting)
+### 5. 速率限制 (Rate Limiting)
 
 遵守飞书API限制：
 - 每秒最多50次请求
 - 每批次最多500条记录
 
-### 5. 数据类型映射 (Data Type Mapping)
+### 6. 数据类型映射 (Data Type Mapping)
 
 | Oracle类型 | 飞书类型 |
 |-----------|---------|
